@@ -27,10 +27,6 @@ module WebJobs =
 
 type Message = { Text : string; Date : DateTime }
 
-let sample =
-    { Text = "Hello from WEBJOBS!"; Date = DateTime.UtcNow }
-    |> Newtonsoft.Json.JsonConvert.SerializeObject
-
 let mutable lastMessage = None
 
 let QueueJob([<QueueTrigger "TestQueue">] message : Message) =
