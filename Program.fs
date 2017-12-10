@@ -13,8 +13,14 @@ open Giraffe
 open Giraffe.Razor
 open GiraffeJob.Models
 open Microsoft.Azure.WebJobs
+open Giraffe.HttpStatusCodeHandlers.Successful
+
+type Message = { Text : string; Date : DateTime }
 
 module WebJobs =
+    open Microsoft.WindowsAzure.Storage
+    open Microsoft.WindowsAzure.Storage.Queue
+    open Newtonsoft.Json
     let start() =
         let host =
             let config =
@@ -25,11 +31,15 @@ module WebJobs =
             new JobHost(config)
         host.Start()
 
-type Message = { Text : string; Date : DateTime }
-
-let sample =
-    { Text = "Hello from WEBJOBS!"; Date = DateTime.UtcNow }
-    |> Newtonsoft.Json.JsonConvert.SerializeObject
+    let post =
+        let q =
+            let q = CloudStorageAccount.DevelopmentStorageAccount.CreateCloudQueueClient()
+            q.GetQueueReference "testqueue"
+        fun message ->
+            { Text = message; Date = DateTime.UtcNow }
+            |> JsonConvert.SerializeObject
+            |> CloudQueueMessage
+            |> q.AddMessageAsync
 
 let mutable lastMessage = None
 
@@ -39,6 +49,8 @@ let QueueJob([<QueueTrigger "TestQueue">] message : Message) =
 // ---------------------------------
 // Web app
 // ---------------------------------
+
+type PostRequest = { Message : string }
 
 let webApp =
     choose [
@@ -55,6 +67,11 @@ let webApp =
                             handler
                             ctx                            
             ]
+        POST >=>
+            fun handler ctx -> task {
+                let! message = ctx.BindModelAsync<PostRequest>()
+                do! WebJobs.post message.Message
+                return! text "Sent!" handler ctx }
         setStatusCode 404 >=> text "Not Found" ]
 
 // ---------------------------------
