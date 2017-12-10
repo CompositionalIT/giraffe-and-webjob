@@ -6,3 +6,4 @@ Microsoft.Extensions.Logging.Debug
 Microsoft.AspNetCore.Authentication.Cookies
 Giraffe.Razor
 Microsoft.DotNet.Watcher.Tools
+Microsoft.Azure.WebJobs

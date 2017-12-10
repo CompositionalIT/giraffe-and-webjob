@@ -12,8 +12,29 @@ open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open Giraffe.Razor
 open GiraffeJob.Models
+open Microsoft.Azure.WebJobs
 
+module WebJobs =
+    let start() =
+        let host =
+            let config =
+                JobHostConfiguration(
+                    DashboardConnectionString = "UseDevelopmentStorage=true",
+                    StorageConnectionString = "UseDevelopmentStorage=true")
+            config.UseDevelopmentSettings()
+            new JobHost(config)
+        host.Start()
 
+type Message = { Text : string; Date : DateTime }
+
+let sample =
+    { Text = "Hello from WEBJOBS!"; Date = DateTime.UtcNow }
+    |> Newtonsoft.Json.JsonConvert.SerializeObject
+
+let mutable lastMessage = None
+
+let QueueJob([<QueueTrigger "TestQueue">] message : Message) =
+    lastMessage <- Some message
 
 // ---------------------------------
 // Web app
@@ -23,7 +44,13 @@ let webApp =
     choose [
         GET >=>
             choose [
-                route "/" >=> razorHtmlView "Index" { Text = "Hello world, from Giraffe!" }
+                route "/" >=>
+                    warbler
+                        (fun _ ->
+                            lastMessage
+                            |> Option.map(fun m -> sprintf "On %O I said '%s'!" m.Date m.Text)
+                            |> Option.defaultValue "Hello world, from Giraffe!"
+                            |> text)
             ]
         setStatusCode 404 >=> text "Not Found" ]
 
@@ -61,6 +88,8 @@ let configureLogging (builder : ILoggingBuilder) =
 
 [<EntryPoint>]
 let main argv =
+    WebJobs.start()
+
     let contentRoot = Directory.GetCurrentDirectory()
     let webRoot     = Path.Combine(contentRoot, "WebRoot")
     WebHostBuilder()
