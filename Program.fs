@@ -27,6 +27,10 @@ module WebJobs =
 
 type Message = { Text : string; Date : DateTime }
 
+let sample =
+    { Text = "Hello from WEBJOBS!"; Date = DateTime.UtcNow }
+    |> Newtonsoft.Json.JsonConvert.SerializeObject
+
 let mutable lastMessage = None
 
 let QueueJob([<QueueTrigger "TestQueue">] message : Message) =
@@ -41,12 +45,15 @@ let webApp =
         GET >=>
             choose [
                 route "/" >=>
-                    warbler
-                        (fun _ ->
-                            lastMessage
-                            |> Option.map(fun m -> sprintf "On %O I said '%s'!" m.Date m.Text)
-                            |> Option.defaultValue "Hello world, from Giraffe!"
-                            |> text)
+                    fun handler ctx ->
+                        razorHtmlView
+                            "Index"
+                            { Text =
+                                lastMessage
+                                |> Option.map(fun m -> sprintf "On %O I said '%s'!" m.Date m.Text)
+                                |> Option.defaultValue "Hello world, from Giraffe!" }
+                            handler
+                            ctx                            
             ]
         setStatusCode 404 >=> text "Not Found" ]
 
